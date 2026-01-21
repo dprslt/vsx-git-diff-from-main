@@ -48,7 +48,7 @@ export class GitService {
   }
 
   /**
-   * Get uncommitted changes (staged + unstaged)
+   * Get uncommitted changes (staged + unstaged + untracked)
    */
   async getUncommittedChanges(): Promise<string[]> {
     try {
@@ -62,6 +62,11 @@ export class GitService {
         cwd: this.workspaceRoot
       });
 
+      // Get untracked files (respects .gitignore)
+      const { stdout: untracked } = await execAsync('git ls-files --others --exclude-standard', {
+        cwd: this.workspaceRoot
+      });
+
       const unstagedFiles = unstaged
         .split('\n')
         .map(line => line.trim())
@@ -72,8 +77,13 @@ export class GitService {
         .map(line => line.trim())
         .filter(line => line.length > 0);
 
+      const untrackedFiles = untracked
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
       // Combine and deduplicate
-      const allFiles = [...new Set([...stagedFiles, ...unstagedFiles])];
+      const allFiles = [...new Set([...stagedFiles, ...unstagedFiles, ...untrackedFiles])];
       return allFiles;
     } catch (error) {
       console.error('Error getting uncommitted changes:', error);
@@ -82,12 +92,14 @@ export class GitService {
   }
 
   /**
-   * Get list of branches from git-spice
+   * Get list of branches from git-spice stack (current branch and all parent branches)
    * Returns empty array if git-spice is not available
    */
   async getGitSpiceBranches(): Promise<string[]> {
     try {
       const gisPath = `${process.env.HOME}/.alan/bin/gis`;
+
+      // Get the current branch's stack (upstack and downstack)
       const { stdout } = await execAsync(`${gisPath} stack`, {
         cwd: this.workspaceRoot
       });
@@ -96,40 +108,27 @@ export class GitService {
       // Example output format:
       // main
       //   feature-1
-      //     feature-2
+      //     feature-2 (current)
+      //       feature-3
       const branches = stdout
         .split('\n')
-        .map(line => line.trim())
         .filter(line => line.length > 0)
-        .map(line => line.replace(/^[│├└─\s]+/, '')) // Remove tree characters
+        .map(line => {
+          // Remove tree characters (│, ├, └, ─, spaces) and annotations like (current)
+          const cleaned = line
+            .replace(/^[│├└─\s]+/, '')  // Remove tree characters
+            .replace(/\s*\(current\)\s*$/, '')  // Remove (current) marker
+            .trim();
+          return cleaned;
+        })
         .filter(branch => branch.length > 0);
 
-      return branches;
+      // Deduplicate branches
+      return [...new Set(branches)];
     } catch (error) {
       console.error('Error getting git-spice branches:', error);
-      // Fallback to regular git branches
-      return this.getRegularBranches();
-    }
-  }
-
-  /**
-   * Get list of regular git branches
-   */
-  private async getRegularBranches(): Promise<string[]> {
-    try {
-      const { stdout } = await execAsync('git branch --format="%(refname:short)"', {
-        cwd: this.workspaceRoot
-      });
-
-      const branches = stdout
-        .split('\n')
-        .map(line => line.trim().replace(/^"|"$/g, ''))
-        .filter(line => line.length > 0);
-
-      return branches;
-    } catch (error) {
-      console.error('Error getting regular branches:', error);
-      return ['main'];
+      // No fallback - only show git-spice branches
+      return [];
     }
   }
 

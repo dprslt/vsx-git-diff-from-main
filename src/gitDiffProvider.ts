@@ -69,7 +69,9 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
 
     // If element is a group, show files in that group
     if (element instanceof GroupItem) {
-      if (element.label === 'Committed Changes') {
+      if (element.label === 'All Changes') {
+        return this.getAllChangesItems();
+      } else if (element.label === 'Committed Changes') {
         return this.getCommittedChangesItems();
       } else if (element.label === 'Uncommitted Changes') {
         return this.getUncommittedChangesItems();
@@ -90,20 +92,39 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       return [item];
     }
 
+    const allChangesGroup = new GroupItem(
+      'All Changes',
+      vscode.TreeItemCollapsibleState.Expanded
+    );
+    allChangesGroup.description = `from ${this.baseBranch}`;
+    allChangesGroup.iconPath = new vscode.ThemeIcon('files');
+
     const committedGroup = new GroupItem(
       'Committed Changes',
-      vscode.TreeItemCollapsibleState.Expanded
+      vscode.TreeItemCollapsibleState.Collapsed
     );
     committedGroup.description = `from ${this.baseBranch}`;
     committedGroup.iconPath = new vscode.ThemeIcon('git-commit');
 
     const uncommittedGroup = new GroupItem(
       'Uncommitted Changes',
-      vscode.TreeItemCollapsibleState.Expanded
+      vscode.TreeItemCollapsibleState.Collapsed
     );
     uncommittedGroup.iconPath = new vscode.ThemeIcon('git-modified');
 
-    return [committedGroup, uncommittedGroup];
+    return [allChangesGroup, committedGroup, uncommittedGroup];
+  }
+
+  /**
+   * Get all changes (committed + uncommitted combined)
+   */
+  private async getAllChangesItems(): Promise<vscode.TreeItem[]> {
+    const committedFiles = await this.gitService.getCommittedChanges(this.baseBranch);
+    const uncommittedFiles = await this.gitService.getUncommittedChanges();
+
+    // Combine and deduplicate
+    const allFiles = [...new Set([...committedFiles, ...uncommittedFiles])];
+    return allFiles.map(file => this.createFileItem(file));
   }
 
   /**

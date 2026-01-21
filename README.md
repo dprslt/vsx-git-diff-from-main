@@ -4,8 +4,9 @@ A VSCode extension that displays files modified from a base branch in the sideba
 
 ## Features
 
+- **All Changes**: Combined view of all changes (committed + uncommitted) in one place
 - **Committed Changes**: Shows files that differ from the base branch (default: `main`)
-- **Uncommitted Changes**: Shows both staged and unstaged changes in your working directory
+- **Uncommitted Changes**: Shows staged, unstaged, and untracked files in your working directory
 - **Direct File Navigation**: Click any file to open it directly (not the diff view)
 - **Git-Spice Integration**: Select any branch from your git-spice stack as the base branch
 - **Auto-Refresh**: Automatically updates when files change or git operations complete
@@ -55,9 +56,10 @@ A VSCode extension that displays files modified from a base branch in the sideba
 
 1. Open a git repository in VSCode
 2. Look for "Git Changes from Base" in the Explorer sidebar
-3. The view shows two groups:
+3. The view shows three groups:
+   - **All Changes**: Combined view of all files (committed + uncommitted)
    - **Committed Changes**: Files differing from the base branch
-   - **Uncommitted Changes**: Staged and unstaged files
+   - **Uncommitted Changes**: Staged, unstaged, and untracked files
 
 ### Opening Files
 
