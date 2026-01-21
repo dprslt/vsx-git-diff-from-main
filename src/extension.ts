@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { GitDiffProvider } from './gitDiffProvider';
 import { GitService } from './gitService';
 
@@ -49,6 +50,44 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
   context.subscriptions.push(openFileCommand);
+
+  // Register open diff view command
+  const openDiffCommand = vscode.commands.registerCommand(
+    'gitDiff.openDiff',
+    async (fileItem: any) => {
+      try {
+        const fileUri = fileItem.resourceUri;
+        const section = fileItem.section;
+        const baseBranch = fileItem.baseBranch;
+        const filePath = fileUri.fsPath;
+
+        let leftUri: vscode.Uri;
+        let title: string;
+
+        if (section === 'all' || section === 'committed') {
+          // Show diff from base branch
+          leftUri = vscode.Uri.parse(`git:${filePath}?ref=${baseBranch}`);
+          title = `${path.basename(filePath)} (${baseBranch} ↔ Working Tree)`;
+        } else {
+          // Uncommitted: show diff from HEAD (last commit)
+          leftUri = vscode.Uri.parse(`git:${filePath}?ref=HEAD`);
+          title = `${path.basename(filePath)} (HEAD ↔ Working Tree)`;
+        }
+
+        const rightUri = fileUri;
+
+        await vscode.commands.executeCommand(
+          'vscode.diff',
+          leftUri,
+          rightUri,
+          title
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(`Failed to open diff: ${error}`);
+      }
+    }
+  );
+  context.subscriptions.push(openDiffCommand);
 
   // Register select base branch command
   const selectBaseBranchCommand = vscode.commands.registerCommand(

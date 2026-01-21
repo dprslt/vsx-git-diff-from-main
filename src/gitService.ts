@@ -93,7 +93,7 @@ export class GitService {
 
   /**
    * Get list of branches from git-spice stack (current branch and all parent branches)
-   * Returns empty array if git-spice is not available
+   * Falls back to regular git branches if git-spice is not available
    */
   async getGitSpiceBranches(): Promise<string[]> {
     try {
@@ -127,8 +127,29 @@ export class GitService {
       return [...new Set(branches)];
     } catch (error) {
       console.error('Error getting git-spice branches:', error);
-      // No fallback - only show git-spice branches
-      return [];
+      // Fallback to regular git branches
+      return this.getRegularBranches();
+    }
+  }
+
+  /**
+   * Get list of regular git branches
+   */
+  private async getRegularBranches(): Promise<string[]> {
+    try {
+      const { stdout } = await execAsync('git branch --format="%(refname:short)"', {
+        cwd: this.workspaceRoot
+      });
+
+      const branches = stdout
+        .split('\n')
+        .map(line => line.trim().replace(/^"|"$/g, ''))
+        .filter(line => line.length > 0);
+
+      return branches;
+    } catch (error) {
+      console.error('Error getting regular branches:', error);
+      return ['main'];
     }
   }
 

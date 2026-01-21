@@ -2,7 +2,7 @@
   "name": "git-diff-sidebar",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "publisher": "your-publisher-name",
   "license": "MIT",
   "engines": {
@@ -34,6 +34,11 @@
       {
         "command": "gitDiff.openFile",
         "title": "Open File"
+      },
+      {
+        "command": "gitDiff.openDiff",
+        "title": "Open Diff View",
+        "icon": "$(diff)"
       }
     ],
     "menus": {
@@ -47,6 +52,13 @@
           "command": "gitDiff.selectBaseBranch",
           "when": "view == gitDiffSidebar",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitDiff.openDiff",
+          "when": "view == gitDiffSidebar && viewItem =~ /^fileItem-/",
+          "group": "inline"
         }
       ]
     }

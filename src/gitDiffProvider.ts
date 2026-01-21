@@ -124,7 +124,7 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
 
     // Combine and deduplicate
     const allFiles = [...new Set([...committedFiles, ...uncommittedFiles])];
-    return allFiles.map(file => this.createFileItem(file));
+    return allFiles.map(file => this.createFileItem(file, 'all'));
   }
 
   /**
@@ -132,7 +132,7 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
    */
   private async getCommittedChangesItems(): Promise<vscode.TreeItem[]> {
     const files = await this.gitService.getCommittedChanges(this.baseBranch);
-    return files.map(file => this.createFileItem(file));
+    return files.map(file => this.createFileItem(file, 'committed'));
   }
 
   /**
@@ -140,13 +140,13 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
    */
   private async getUncommittedChangesItems(): Promise<vscode.TreeItem[]> {
     const files = await this.gitService.getUncommittedChanges();
-    return files.map(file => this.createFileItem(file));
+    return files.map(file => this.createFileItem(file, 'uncommitted'));
   }
 
   /**
    * Create a file tree item
    */
-  private createFileItem(filePath: string): FileItem {
+  private createFileItem(filePath: string, section: 'all' | 'committed' | 'uncommitted'): FileItem {
     const fileName = path.basename(filePath);
     const fileUri = vscode.Uri.file(path.join(this.workspaceRoot, filePath));
 
@@ -154,6 +154,8 @@ export class GitDiffProvider implements vscode.TreeDataProvider<vscode.TreeItem>
       fileName,
       fileUri,
       vscode.TreeItemCollapsibleState.None,
+      section,
+      this.baseBranch,
       {
         command: 'gitDiff.openFile',
         title: 'Open File',

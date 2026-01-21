@@ -8,6 +8,7 @@ A VSCode extension that displays files modified from a base branch in the sideba
 - **Committed Changes**: Shows files that differ from the base branch (default: `main`)
 - **Uncommitted Changes**: Shows staged, unstaged, and untracked files in your working directory
 - **Direct File Navigation**: Click any file to open it directly (not the diff view)
+- **Diff View**: Click the diff icon next to any file to view changes side-by-side
 - **Git-Spice Integration**: Select any branch from your git-spice stack as the base branch
 - **Auto-Refresh**: Automatically updates when files change or git operations complete
 
@@ -63,15 +64,18 @@ A VSCode extension that displays files modified from a base branch in the sideba
 
 ### Opening Files
 
-- Click any file in the list to open it directly in the editor
-- The file opens at its current state (not a diff view)
+- **Click a file**: Opens it directly in the editor (not a diff view)
+- **Click the diff icon (📊)**: Opens the diff view showing changes
+  - **All Changes / Committed Changes**: Shows diff from the base branch
+  - **Uncommitted Changes**: Shows diff from HEAD (last commit)
 
 ### Changing Base Branch
 
 1. Click the branch icon (🌿) in the Git Changes toolbar
-2. Select a branch from the list
+2. Select a branch from the list:
+   - If git-spice is available: Shows branches from your git-spice stack
+   - If git-spice is not available: Shows all git branches in the repository
 3. The view updates to show changes from the new base branch
-4. Git-spice branches are shown if available, otherwise falls back to regular git branches
 
 ### Manual Refresh
 
@@ -84,13 +88,15 @@ The extension stores the selected base branch per workspace, so each project can
 
 ## Git-Spice Support
 
-If you use [git-spice](https://github.com/abhinav/git-spice), the extension will detect it and show your stacked branches in the branch selector. The git-spice binary is expected at:
+This extension supports [git-spice](https://github.com/abhinav/git-spice) workflows. When git-spice is available, the branch selector shows branches from your git-spice stack (parent and child branches in the tree).
 
-```
+The git-spice binary is expected at:
+
+```bash
 ~/.alan/bin/gis
 ```
 
-If git-spice is not available, the extension falls back to showing regular git branches.
+If git-spice is not available, the extension falls back to showing all regular git branches.
 
 ## Requirements
 
@@ -101,7 +107,7 @@ If git-spice is not available, the extension falls back to showing regular git b
 
 ### Project Structure
 
-```
+```text
 vscode-git-diff-sidebar/
 ├── src/
 │   ├── extension.ts          # Extension entry point

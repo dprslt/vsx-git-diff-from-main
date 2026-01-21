@@ -8,11 +8,14 @@ export class FileItem extends vscode.TreeItem {
     public readonly label: string,
     public readonly resourceUri: vscode.Uri,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly section: 'all' | 'committed' | 'uncommitted',
+    public readonly baseBranch: string,
     public readonly command?: vscode.Command
   ) {
     super(label, collapsibleState);
     this.resourceUri = resourceUri;
     this.tooltip = resourceUri.fsPath;
+    this.contextValue = `fileItem-${section}`;
 
     // Set the command to open the file when clicked
     if (command) {
