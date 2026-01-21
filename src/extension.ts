@@ -2,33 +2,45 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { GitDiffProvider } from './gitDiffProvider';
 import { GitService } from './gitService';
+import { Logger } from './logger';
 
 /**
  * Extension activation
  */
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Git Diff Sidebar extension is now active');
+  // Initialize logger
+  Logger.initialize('Git Diff Sidebar');
+  Logger.log('Extension activating...');
+  Logger.log('========================================');
+
+  // Show the output channel
+  Logger.show();
 
   // Check if we have a workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
+    Logger.log('No workspace folder found');
     vscode.window.showWarningMessage('Git Diff Sidebar: No workspace folder found');
     return;
   }
 
   const workspaceRoot = workspaceFolders[0].uri.fsPath;
+  Logger.log(`Workspace root: ${workspaceRoot}`);
   const gitService = new GitService(workspaceRoot);
 
   // Create the tree data provider
+  Logger.log('Creating tree data provider...');
   const gitDiffProvider = new GitDiffProvider(context);
 
   // Register the tree data provider
+  Logger.log('Registering tree view...');
   const treeView = vscode.window.createTreeView('gitDiffSidebar', {
     treeDataProvider: gitDiffProvider,
     showCollapseAll: true
   });
 
   context.subscriptions.push(treeView);
+  Logger.log('Tree view registered successfully');
 
   // Register refresh command
   const refreshCommand = vscode.commands.registerCommand('gitDiff.refresh', () => {
@@ -150,12 +162,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(gitWatcher);
 
   // Initial refresh
+  Logger.log('Triggering initial refresh...');
   gitDiffProvider.refresh();
+
+  Logger.log('========================================');
+  Logger.log('Extension activated successfully!');
 }
 
 /**
  * Extension deactivation
  */
 export function deactivate() {
-  console.log('Git Diff Sidebar extension is now deactivated');
+  Logger.log('Extension deactivating...');
+  Logger.dispose();
 }

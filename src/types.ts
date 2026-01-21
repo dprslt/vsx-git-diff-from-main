@@ -30,9 +30,11 @@ export class FileItem extends vscode.TreeItem {
 export class GroupItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly id: string
   ) {
     super(label, collapsibleState);
+    this.id = id;
     this.contextValue = 'group';
   }
 }

@@ -2,7 +2,7 @@
   "name": "git-diff-sidebar",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "your-publisher-name",
   "license": "MIT",
   "engines": {

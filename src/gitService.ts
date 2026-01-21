@@ -1,6 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as vscode from 'vscode';
+import { Logger } from './logger';
 
 const execAsync = promisify(exec);
 
@@ -24,7 +25,7 @@ export class GitService {
       });
       return stdout.trim();
     } catch (error) {
-      console.error('Error getting current branch:', error);
+      Logger.error('Error getting current branch:', error);
       return 'main';
     }
   }
@@ -34,15 +35,22 @@ export class GitService {
    */
   async getCommittedChanges(baseBranch: string): Promise<string[]> {
     try {
-      const { stdout } = await execAsync(`git diff --name-only ${baseBranch}`, {
+      const command = `git diff --name-only ${baseBranch}`;
+      Logger.log(`[GitService] Running: ${command}`);
+      const { stdout, stderr } = await execAsync(command, {
         cwd: this.workspaceRoot
       });
-      return stdout
+      if (stderr) {
+        Logger.log(`[GitService] stderr: ${stderr}`);
+      }
+      const files = stdout
         .split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0);
+      Logger.log(`[GitService] Found ${files.length} committed changes`);
+      return files;
     } catch (error) {
-      console.error('Error getting committed changes:', error);
+      Logger.error('[GitService] Error getting committed changes', error);
       return [];
     }
   }
@@ -52,17 +60,22 @@ export class GitService {
    */
   async getUncommittedChanges(): Promise<string[]> {
     try {
+      Logger.log('[GitService] Getting uncommitted changes...');
+
       // Get unstaged changes
+      Logger.log('[GitService] Running: git diff --name-only');
       const { stdout: unstaged } = await execAsync('git diff --name-only', {
         cwd: this.workspaceRoot
       });
 
       // Get staged changes
+      Logger.log('[GitService] Running: git diff --name-only --cached');
       const { stdout: staged } = await execAsync('git diff --name-only --cached', {
         cwd: this.workspaceRoot
       });
 
       // Get untracked files (respects .gitignore)
+      Logger.log('[GitService] Running: git ls-files --others --exclude-standard');
       const { stdout: untracked } = await execAsync('git ls-files --others --exclude-standard', {
         cwd: this.workspaceRoot
       });
@@ -82,11 +95,14 @@ export class GitService {
         .map(line => line.trim())
         .filter(line => line.length > 0);
 
+      Logger.log(`[GitService] Unstaged: ${unstagedFiles.length}, Staged: ${stagedFiles.length}, Untracked: ${untrackedFiles.length}`);
+
       // Combine and deduplicate
       const allFiles = [...new Set([...stagedFiles, ...unstagedFiles, ...untrackedFiles])];
+      Logger.log(`[GitService] Total uncommitted changes: ${allFiles.length}`);
       return allFiles;
     } catch (error) {
-      console.error('Error getting uncommitted changes:', error);
+      Logger.error('[GitService] Error getting uncommitted changes', error);
       return [];
     }
   }
@@ -126,7 +142,7 @@ export class GitService {
       // Deduplicate branches
       return [...new Set(branches)];
     } catch (error) {
-      console.error('Error getting git-spice branches:', error);
+      Logger.error('Error getting git-spice branches:', error);
       // Fallback to regular git branches
       return this.getRegularBranches();
     }
@@ -148,7 +164,7 @@ export class GitService {
 
       return branches;
     } catch (error) {
-      console.error('Error getting regular branches:', error);
+      Logger.error('Error getting regular branches:', error);
       return ['main'];
     }
   }
@@ -158,11 +174,14 @@ export class GitService {
    */
   async isGitRepository(): Promise<boolean> {
     try {
+      Logger.log(`[GitService] Checking if ${this.workspaceRoot} is a git repository...`);
       await execAsync('git rev-parse --git-dir', {
         cwd: this.workspaceRoot
       });
+      Logger.log('[GitService] Confirmed: is a git repository');
       return true;
     } catch (error) {
+      Logger.log('[GitService] Not a git repository');
       return false;
     }
   }
