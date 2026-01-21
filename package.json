@@ -1,0 +1,65 @@
+{
+  "name": "git-diff-sidebar",
+  "displayName": "Git Diff Sidebar",
+  "description": "Shows files changed from a base branch in the sidebar",
+  "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "id": "gitDiffSidebar",
+          "name": "Git Changes from Base"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitDiff.refresh",
+        "title": "Refresh Git Changes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitDiff.selectBaseBranch",
+        "title": "Select Base Branch",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "gitDiff.openFile",
+        "title": "Open File"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitDiff.refresh",
+          "when": "view == gitDiffSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "gitDiff.selectBaseBranch",
+          "when": "view == gitDiffSidebar",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.3"
+  }
+}
