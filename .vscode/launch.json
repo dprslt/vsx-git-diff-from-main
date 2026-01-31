@@ -2,10 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Extension",
+      "name": "Run Extension (Cursor)",
       "type": "extensionHost",
       "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "runtimeExecutable": "/Applications/Cursor.app/Contents/MacOS/Cursor",
+      "args": [
+        "--new-window",
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "/Users/theo.depresle/repos/vscode-git-diff-sidebar"
+      ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}"
     },
@@ -13,6 +18,7 @@
       "name": "Extension Tests",
       "type": "extensionHost",
       "request": "launch",
+      "runtimeExecutable": "/Applications/Cursor.app/Contents/MacOS/Cursor",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}",
         "--extensionTestsPath=${workspaceFolder}/out/test/suite/index"

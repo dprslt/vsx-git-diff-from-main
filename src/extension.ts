@@ -1,8 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { GitDiffProvider } from './gitDiffProvider';
 import { GitService } from './gitService';
 import { Logger } from './logger';
+
+const execAsync = promisify(exec);
 
 /**
  * Extension activation
@@ -63,6 +67,26 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(openFileCommand);
 
+  // Register a content provider for git file contents
+  const gitContentProvider = new (class implements vscode.TextDocumentContentProvider {
+    async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+      const params = JSON.parse(uri.query);
+      const { relativePath, ref } = params;
+      try {
+        const { stdout } = await execAsync(`git show ${ref}:${relativePath}`, {
+          cwd: workspaceRoot
+        });
+        return stdout;
+      } catch {
+        return '';
+      }
+    }
+  })();
+
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider('gitdiff', gitContentProvider)
+  );
+
   // Register open diff view command
   const openDiffCommand = vscode.commands.registerCommand(
     'gitDiff.openDiff',
@@ -71,27 +95,33 @@ export function activate(context: vscode.ExtensionContext) {
         const fileUri = fileItem.resourceUri;
         const section = fileItem.section;
         const baseBranch = fileItem.baseBranch;
-        const filePath = fileUri.fsPath;
+        const absolutePath = fileUri.fsPath;
 
-        let leftUri: vscode.Uri;
+        // Get relative path from workspace root
+        const relativePath = path.relative(workspaceRoot, absolutePath);
+
+        let ref: string;
         let title: string;
 
         if (section === 'all' || section === 'committed') {
-          // Show diff from base branch
-          leftUri = vscode.Uri.parse(`git:${filePath}?ref=${baseBranch}`);
-          title = `${path.basename(filePath)} (${baseBranch} ↔ Working Tree)`;
+          ref = baseBranch;
+          title = `${path.basename(absolutePath)} (${baseBranch} ↔ Working Tree)`;
         } else {
-          // Uncommitted: show diff from HEAD (last commit)
-          leftUri = vscode.Uri.parse(`git:${filePath}?ref=HEAD`);
-          title = `${path.basename(filePath)} (HEAD ↔ Working Tree)`;
+          ref = 'HEAD';
+          title = `${path.basename(absolutePath)} (HEAD ↔ Working Tree)`;
         }
 
-        const rightUri = fileUri;
+        // Build URI for our custom content provider
+        const gitUri = vscode.Uri.from({
+          scheme: 'gitdiff',
+          path: absolutePath,
+          query: JSON.stringify({ relativePath, ref })
+        });
 
         await vscode.commands.executeCommand(
           'vscode.diff',
-          leftUri,
-          rightUri,
+          gitUri,
+          fileUri,
           title
         );
       } catch (error) {
@@ -135,19 +165,41 @@ export function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(selectBaseBranchCommand);
 
+  // Debounced refresh to prevent infinite loops from file watcher cascades
+  let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+  const REFRESH_DEBOUNCE_MS = 300;
+
+  const debouncedRefresh = () => {
+    if (refreshTimeout) {
+      clearTimeout(refreshTimeout);
+    }
+    refreshTimeout = setTimeout(() => {
+      gitDiffProvider.refresh();
+    }, REFRESH_DEBOUNCE_MS);
+  };
+
+  // Clean up timeout on deactivation
+  context.subscriptions.push({
+    dispose: () => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+    }
+  });
+
   // Set up file system watcher for auto-refresh
   const fileWatcher = vscode.workspace.createFileSystemWatcher('**/*');
 
   fileWatcher.onDidChange(() => {
-    gitDiffProvider.refresh();
+    debouncedRefresh();
   });
 
   fileWatcher.onDidCreate(() => {
-    gitDiffProvider.refresh();
+    debouncedRefresh();
   });
 
   fileWatcher.onDidDelete(() => {
-    gitDiffProvider.refresh();
+    debouncedRefresh();
   });
 
   context.subscriptions.push(fileWatcher);
@@ -156,7 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
   const gitWatcher = vscode.workspace.createFileSystemWatcher('**/.git/**');
 
   gitWatcher.onDidChange(() => {
-    gitDiffProvider.refresh();
+    debouncedRefresh();
   });
 
   context.subscriptions.push(gitWatcher);

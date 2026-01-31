@@ -31,11 +31,12 @@ export class GitService {
   }
 
   /**
-   * Get files that differ from the base branch (committed changes)
+   * Get files that differ from the base branch (committed changes only)
    */
   async getCommittedChanges(baseBranch: string): Promise<string[]> {
     try {
-      const command = `git diff --name-only ${baseBranch}`;
+      // Compare base branch to HEAD (not working tree) to exclude uncommitted changes
+      const command = `git diff --name-only ${baseBranch} HEAD`;
       Logger.log(`[GitService] Running: ${command}`);
       const { stdout, stderr } = await execAsync(command, {
         cwd: this.workspaceRoot

@@ -2,14 +2,18 @@
   "name": "git-diff-sidebar",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.5",
+  "version": "0.0.8",
   "publisher": "your-publisher-name",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "views": {
@@ -67,7 +71,8 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package",
+    "release": "npm version patch --no-git-tag-version && npm run compile && npm run package"
   },
   "devDependencies": {
     "@types/node": "^20.x",
