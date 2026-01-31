@@ -50,6 +50,16 @@
         "icon": "$(diff)"
       }
     ],
+"configuration": {
+      "title": "Git Diff Sidebar",
+      "properties": {
+        "gitDiffSidebar.gitSpiceExecutable": {
+          "type": "string",
+          "default": "gs",
+          "description": "Path to git-spice executable (gs)"
+        }
+      }
+    },
     "menus": {
       "view/title": [
         {

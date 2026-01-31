@@ -136,28 +136,88 @@ export function activate(context: vscode.ExtensionContext) {
     'gitDiff.selectBaseBranch',
     async () => {
       try {
-        // Get available branches
-        const branches = await gitService.getGitSpiceBranches();
+        const currentBaseBranch = gitDiffProvider.getBaseBranch();
 
-        if (branches.length === 0) {
-          vscode.window.showWarningMessage('No branches found');
-          return;
-        }
+        // Create QuickPick for sections and dynamic filtering
+        const quickPick = vscode.window.createQuickPick();
+        quickPick.title = `Select Base Branch (current: ${currentBaseBranch})`;
+        quickPick.placeholder = 'Type to filter branches...';
+        quickPick.matchOnDescription = true;
 
-        // Show quick pick
-        const currentBranch = gitDiffProvider.getBaseBranch();
-        const selected = await vscode.window.showQuickPick(branches, {
-          placeHolder: 'Select base branch to compare against',
-          title: 'Select Base Branch',
-          canPickMany: false,
-          matchOnDescription: true,
-          matchOnDetail: true
+        // Build initial items
+        const buildItems = async (filterQuery?: string): Promise<vscode.QuickPickItem[]> => {
+          const items: vscode.QuickPickItem[] = [];
+
+          if (filterQuery && filterQuery.length > 0) {
+            // When filtering, show filtered results only
+            const filtered = await gitService.filterBranches(filterQuery, 10);
+            items.push(...filtered.map(b => ({ label: b })));
+          } else {
+            // Show git-spice stack branches (prefixed with emoji) + recent branches
+            const isInStack = await gitService.isInGitSpiceStack();
+            const stackBranchSet = new Set<string>();
+
+            if (isInStack) {
+              const stackBranches = await gitService.getGitSpiceParentBranches();
+              for (const b of stackBranches) {
+                stackBranchSet.add(b);
+                items.push({ label: `🥞 ${b}`, description: 'git-spice stack' });
+              }
+            }
+
+            // Recent branches (skip first one which is current branch, and skip stack branches)
+            const recentBranches = await gitService.getRecentBranches(11);
+            const filteredRecent = recentBranches
+              .slice(1) // Skip first (current branch)
+              .filter(b => !stackBranchSet.has(b))
+              .slice(0, 10);
+            items.push(...filteredRecent.map(b => ({ label: b })));
+          }
+
+          return items;
+        };
+
+        // Load initial items
+        quickPick.busy = true;
+        quickPick.items = await buildItems();
+        quickPick.busy = false;
+
+        // Debounce for filter updates
+        let filterTimeout: ReturnType<typeof setTimeout> | undefined;
+
+        quickPick.onDidChangeValue(async (value) => {
+          if (filterTimeout) {
+            clearTimeout(filterTimeout);
+          }
+          filterTimeout = setTimeout(async () => {
+            quickPick.busy = true;
+            quickPick.items = await buildItems(value);
+            quickPick.busy = false;
+          }, 150);
         });
 
-        if (selected && selected !== currentBranch) {
-          await gitDiffProvider.setBaseBranch(selected);
-          vscode.window.showInformationMessage(`Base branch changed to: ${selected}`);
-        }
+        // Handle selection
+        quickPick.onDidAccept(async () => {
+          const selected = quickPick.selectedItems[0];
+          if (selected) {
+            // Strip emoji prefix if present
+            const branchName = selected.label.replace(/^🥞 /, '');
+            if (branchName !== currentBaseBranch) {
+              await gitDiffProvider.setBaseBranch(branchName);
+              vscode.window.showInformationMessage(`Base branch changed to: ${branchName}`);
+            }
+          }
+          quickPick.dispose();
+        });
+
+        quickPick.onDidHide(() => {
+          if (filterTimeout) {
+            clearTimeout(filterTimeout);
+          }
+          quickPick.dispose();
+        });
+
+        quickPick.show();
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to select base branch: ${error}`);
       }

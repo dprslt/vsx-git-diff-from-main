@@ -1,5 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import * as os from 'os';
 import * as vscode from 'vscode';
 import { Logger } from './logger';
 
@@ -13,6 +14,53 @@ export class GitService {
 
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
+  }
+
+  /**
+   * Get git-spice executable path from settings (expands ~ to home directory)
+   */
+  private getGitSpiceExecutable(): string {
+    const config = vscode.workspace.getConfiguration('gitDiffSidebar');
+    let path = config.get<string>('gitSpiceExecutable', 'gs');
+    if (path.startsWith('~')) {
+      path = path.replace('~', os.homedir());
+    }
+    return path;
+  }
+
+  /**
+   * Run git-spice command and return combined stdout+stderr (git-spice outputs to stderr)
+   */
+  private async runGitSpice(args: string): Promise<string | null> {
+    try {
+      const gsPath = this.getGitSpiceExecutable();
+      const { stdout, stderr } = await execAsync(`${gsPath} ${args}`, {
+        cwd: this.workspaceRoot
+      });
+      return stdout + stderr;
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      if (errorMsg.includes('ENOENT') || errorMsg.includes('command not found')) {
+        Logger.log(`[GitService] git-spice not found: ${this.getGitSpiceExecutable()}`);
+      } else {
+        Logger.log(`[GitService] git-spice error: ${errorMsg}`);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Extract branch name from git-spice output line
+   * Strips tree chars, PR refs (#123), status markers (needs restack), current marker (◀)
+   */
+  private extractBranchName(line: string): string | null {
+    const cleaned = line
+      .replace(/^[\s│├└┏┻━■□─┃]+/, '') // tree chars
+      .replace(/\s*◀\s*$/, '')          // current marker
+      .replace(/\s*\(#\d+\)/g, '')      // PR refs
+      .replace(/\s*\([^)]+\)/g, '')     // status markers
+      .trim();
+    return cleaned.length > 0 ? cleaned : null;
   }
 
   /**
@@ -35,21 +83,10 @@ export class GitService {
    */
   async getCommittedChanges(baseBranch: string): Promise<string[]> {
     try {
-      // Compare base branch to HEAD (not working tree) to exclude uncommitted changes
-      const command = `git diff --name-only ${baseBranch} HEAD`;
-      Logger.log(`[GitService] Running: ${command}`);
-      const { stdout, stderr } = await execAsync(command, {
+      const { stdout } = await execAsync(`git diff --name-only ${baseBranch} HEAD`, {
         cwd: this.workspaceRoot
       });
-      if (stderr) {
-        Logger.log(`[GitService] stderr: ${stderr}`);
-      }
-      const files = stdout
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-      Logger.log(`[GitService] Found ${files.length} committed changes`);
-      return files;
+      return stdout.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     } catch (error) {
       Logger.error('[GitService] Error getting committed changes', error);
       return [];
@@ -61,47 +98,14 @@ export class GitService {
    */
   async getUncommittedChanges(): Promise<string[]> {
     try {
-      Logger.log('[GitService] Getting uncommitted changes...');
+      const [unstaged, staged, untracked] = await Promise.all([
+        execAsync('git diff --name-only', { cwd: this.workspaceRoot }),
+        execAsync('git diff --name-only --cached', { cwd: this.workspaceRoot }),
+        execAsync('git ls-files --others --exclude-standard', { cwd: this.workspaceRoot })
+      ]);
 
-      // Get unstaged changes
-      Logger.log('[GitService] Running: git diff --name-only');
-      const { stdout: unstaged } = await execAsync('git diff --name-only', {
-        cwd: this.workspaceRoot
-      });
-
-      // Get staged changes
-      Logger.log('[GitService] Running: git diff --name-only --cached');
-      const { stdout: staged } = await execAsync('git diff --name-only --cached', {
-        cwd: this.workspaceRoot
-      });
-
-      // Get untracked files (respects .gitignore)
-      Logger.log('[GitService] Running: git ls-files --others --exclude-standard');
-      const { stdout: untracked } = await execAsync('git ls-files --others --exclude-standard', {
-        cwd: this.workspaceRoot
-      });
-
-      const unstagedFiles = unstaged
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-
-      const stagedFiles = staged
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-
-      const untrackedFiles = untracked
-        .split('\n')
-        .map(line => line.trim())
-        .filter(line => line.length > 0);
-
-      Logger.log(`[GitService] Unstaged: ${unstagedFiles.length}, Staged: ${stagedFiles.length}, Untracked: ${untrackedFiles.length}`);
-
-      // Combine and deduplicate
-      const allFiles = [...new Set([...stagedFiles, ...unstagedFiles, ...untrackedFiles])];
-      Logger.log(`[GitService] Total uncommitted changes: ${allFiles.length}`);
-      return allFiles;
+      const parse = (s: string) => s.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      return [...new Set([...parse(staged.stdout), ...parse(unstaged.stdout), ...parse(untracked.stdout)])];
     } catch (error) {
       Logger.error('[GitService] Error getting uncommitted changes', error);
       return [];
@@ -109,44 +113,82 @@ export class GitService {
   }
 
   /**
-   * Get list of branches from git-spice stack (current branch and all parent branches)
+   * Check if currently in a git-spice stack (◀ marker present = current branch tracked)
+   */
+  async isInGitSpiceStack(): Promise<boolean> {
+    const output = await this.runGitSpice('ls');
+    return output !== null && output.includes('◀');
+  }
+
+  /**
+   * Get parent branches in git-spice stack (branches below current toward main)
+   */
+  async getGitSpiceParentBranches(): Promise<string[]> {
+    const output = await this.runGitSpice('ls');
+    if (!output) return [];
+
+    const lines = output.split('\n').filter(l => l.length > 0 && !l.startsWith('INF'));
+    const parents: string[] = [];
+    let foundCurrent = false;
+
+    for (const line of lines) {
+      if (line.includes('◀')) {
+        foundCurrent = true;
+        continue;
+      }
+      if (foundCurrent) {
+        const branch = this.extractBranchName(line);
+        if (branch) parents.push(branch);
+      }
+    }
+
+    Logger.log(`[GitService] Parent branches: ${parents.join(', ') || '(none)'}`);
+    return parents;
+  }
+
+  /**
+   * Get recent branches sorted by commit date
+   */
+  async getRecentBranches(limit: number): Promise<string[]> {
+    try {
+      const { stdout } = await execAsync(
+        `git branch --sort=-committerdate --format="%(refname:short)"`,
+        { cwd: this.workspaceRoot }
+      );
+      return stdout.split('\n').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0).slice(0, limit);
+    } catch (error) {
+      Logger.error('Error getting recent branches:', error);
+      return ['main'];
+    }
+  }
+
+  /**
+   * Filter branches by query pattern
+   */
+  async filterBranches(query: string, limit: number): Promise<string[]> {
+    try {
+      const { stdout } = await execAsync(
+        `git branch --list "*${query}*" --sort=-committerdate --format="%(refname:short)"`,
+        { cwd: this.workspaceRoot }
+      );
+      return stdout.split('\n').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0).slice(0, limit);
+    } catch (error) {
+      Logger.error('Error filtering branches:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get list of branches from git-spice stack
    * Falls back to regular git branches if git-spice is not available
    */
   async getGitSpiceBranches(): Promise<string[]> {
-    try {
-      const gisPath = 'gs';
+    const output = await this.runGitSpice('ls');
+    if (!output) return this.getRegularBranches();
 
-      // Get the current branch's stack (upstack and downstack)
-      const { stdout } = await execAsync(`${gisPath} stack`, {
-        cwd: this.workspaceRoot
-      });
-
-      // Parse the git-spice stack output
-      // Example output format:
-      // main
-      //   feature-1
-      //     feature-2 (current)
-      //       feature-3
-      const branches = stdout
-        .split('\n')
-        .filter(line => line.length > 0)
-        .map(line => {
-          // Remove tree characters (│, ├, └, ─, spaces) and annotations like (current)
-          const cleaned = line
-            .replace(/^[│├└─\s]+/, '')  // Remove tree characters
-            .replace(/\s*\(current\)\s*$/, '')  // Remove (current) marker
-            .trim();
-          return cleaned;
-        })
-        .filter(branch => branch.length > 0);
-
-      // Deduplicate branches
-      return [...new Set(branches)];
-    } catch (error) {
-      Logger.error('Error getting git-spice branches:', error);
-      // Fallback to regular git branches
-      return this.getRegularBranches();
-    }
+    const lines = output.split('\n').filter(l => l.length > 0 && !l.startsWith('INF'));
+    const branches = lines.map(l => this.extractBranchName(l)).filter((b): b is string => b !== null);
+    return [...new Set(branches)];
   }
 
   /**
@@ -157,13 +199,7 @@ export class GitService {
       const { stdout } = await execAsync('git branch --format="%(refname:short)"', {
         cwd: this.workspaceRoot
       });
-
-      const branches = stdout
-        .split('\n')
-        .map(line => line.trim().replace(/^"|"$/g, ''))
-        .filter(line => line.length > 0);
-
-      return branches;
+      return stdout.split('\n').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0);
     } catch (error) {
       Logger.error('Error getting regular branches:', error);
       return ['main'];
@@ -175,14 +211,9 @@ export class GitService {
    */
   async isGitRepository(): Promise<boolean> {
     try {
-      Logger.log(`[GitService] Checking if ${this.workspaceRoot} is a git repository...`);
-      await execAsync('git rev-parse --git-dir', {
-        cwd: this.workspaceRoot
-      });
-      Logger.log('[GitService] Confirmed: is a git repository');
+      await execAsync('git rev-parse --git-dir', { cwd: this.workspaceRoot });
       return true;
-    } catch (error) {
-      Logger.log('[GitService] Not a git repository');
+    } catch {
       return false;
     }
   }

@@ -23,6 +23,19 @@ From [Open VSX Registry](https://open-vsx.org/extension/dprslt/vsx-git-diff-from
 2. Find "Changes from Base" in Source Control sidebar
 3. Use toolbar icons to refresh or change base branch
 
+## Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `gitDiffSidebar.gitSpiceExecutable` | `gs` | Path to git-spice executable |
+
+Example (in `settings.json`):
+```json
+{
+  "gitDiffSidebar.gitSpiceExecutable": "gs"
+}
+```
+
 ## Development
 
 ```bash
