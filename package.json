@@ -1,0 +1,90 @@
+{
+  "name": "vsx-git-diff-from-main",
+  "displayName": "Git Diff Sidebar",
+  "description": "Shows files changed from a base branch in the sidebar",
+  "version": "0.0.10",
+  "publisher": "dprslt",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dprslt/vsx-git-diff-from-main"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "views": {
+      "scm": [
+        {
+          "id": "gitDiffSidebar",
+          "name": "Changes from Base"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "gitDiff.refresh",
+        "title": "Refresh Git Changes",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitDiff.selectBaseBranch",
+        "title": "Select Base Branch",
+        "icon": "$(git-branch)"
+      },
+      {
+        "command": "gitDiff.openFile",
+        "title": "Open File"
+      },
+      {
+        "command": "gitDiff.openDiff",
+        "title": "Open Diff View",
+        "icon": "$(diff)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "gitDiff.refresh",
+          "when": "view == gitDiffSidebar",
+          "group": "navigation"
+        },
+        {
+          "command": "gitDiff.selectBaseBranch",
+          "when": "view == gitDiffSidebar",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitDiff.openDiff",
+          "when": "view == gitDiffSidebar && viewItem =~ /^fileItem-/",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "version:patch": "npm version patch",
+    "version:minor": "npm version minor",
+    "version:major": "npm version major",
+    "publish": "git push --follow-tags"
+  },
+  "devDependencies": {
+    "@types/node": "^20.x",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.7.1",
+    "typescript": "^5.3.3"
+  }
+}
