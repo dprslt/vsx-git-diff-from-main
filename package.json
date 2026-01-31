@@ -2,7 +2,7 @@
   "name": "git-diff-sidebar",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "publisher": "your-publisher-name",
   "license": "MIT",
   "engines": {
@@ -17,10 +17,10 @@
   "main": "./out/extension.js",
   "contributes": {
     "views": {
-      "explorer": [
+      "scm": [
         {
           "id": "gitDiffSidebar",
-          "name": "Git Changes from Base"
+          "name": "Changes from Base"
         }
       ]
     },
