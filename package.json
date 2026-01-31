@@ -2,7 +2,7 @@
   "name": "vsx-git-diff-from-main",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "publisher": "dprslt",
   "license": "MIT",
   "icon": "icon.png",
@@ -50,7 +50,7 @@
         "icon": "$(diff)"
       }
     ],
-"configuration": {
+    "configuration": {
       "title": "Git Diff Sidebar",
       "properties": {
         "gitDiffSidebar.gitSpiceExecutable": {
