@@ -8,8 +8,7 @@
       "runtimeExecutable": "/Applications/Cursor.app/Contents/MacOS/Cursor",
       "args": [
         "--new-window",
-        "--extensionDevelopmentPath=${workspaceFolder}",
-        "/Users/theo.depresle/repos/vscode-git-diff-sidebar"
+        "--extensionDevelopmentPath=${workspaceFolder}"
       ],
       "outFiles": ["${workspaceFolder}/out/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}"
