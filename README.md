@@ -23,6 +23,9 @@ From [Open VSX Registry](https://open-vsx.org/extension/dprslt/vsx-git-diff-from
 2. Find "Changes from Base" in Source Control sidebar
 3. Use toolbar icons to refresh or change base branch
 
+<img width="387" height="254" alt="image" src="https://github.com/user-attachments/assets/be4678b1-8245-42bd-9688-6da447754eec" />
+
+
 ## Settings
 
 | Setting | Default | Description |
