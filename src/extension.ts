@@ -32,28 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
   Logger.log(`Workspace root: ${workspaceRoot}`);
   const gitService = new GitService(workspaceRoot);
 
-  // Create the tree data provider
-  Logger.log('Creating tree data provider...');
-  const gitDiffProvider = new GitDiffProvider(context);
-
-  // Register the tree data provider
-  Logger.log('Registering tree view...');
-  const treeView = vscode.window.createTreeView('gitDiffSidebar', {
-    treeDataProvider: gitDiffProvider,
-    showCollapseAll: true
-  });
-
-  context.subscriptions.push(treeView);
-  Logger.log('Tree view registered successfully');
-
-  // Register refresh command
-  const refreshCommand = vscode.commands.registerCommand('gitDiff.refresh', () => {
-    gitDiffProvider.refresh();
-    vscode.window.showInformationMessage('Git changes refreshed');
-  });
-  context.subscriptions.push(refreshCommand);
-
-  // Register open file command
+  // Register open file command BEFORE creating tree view
   const openFileCommand = vscode.commands.registerCommand(
     'gitDiff.openFile',
     async (fileUri: vscode.Uri) => {
@@ -66,6 +45,27 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
   context.subscriptions.push(openFileCommand);
+
+  // Create the tree data provider
+  Logger.log('Creating tree data provider...');
+  const gitDiffProvider = new GitDiffProvider(context);
+
+  // Register refresh command
+  const refreshCommand = vscode.commands.registerCommand('gitDiff.refresh', () => {
+    gitDiffProvider.refresh();
+    vscode.window.showInformationMessage('Git changes refreshed');
+  });
+  context.subscriptions.push(refreshCommand);
+
+  // Register the tree data provider
+  Logger.log('Registering tree view...');
+  const treeView = vscode.window.createTreeView('gitDiffSidebar', {
+    treeDataProvider: gitDiffProvider,
+    showCollapseAll: true
+  });
+
+  context.subscriptions.push(treeView);
+  Logger.log('Tree view registered successfully');
 
   // Register a content provider for git file contents
   const gitContentProvider = new (class implements vscode.TextDocumentContentProvider {
