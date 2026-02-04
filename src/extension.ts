@@ -17,9 +17,6 @@ export function activate(context: vscode.ExtensionContext) {
   Logger.log('Extension activating...');
   Logger.log('========================================');
 
-  // Show the output channel
-  Logger.show();
-
   // Check if we have a workspace
   const workspaceFolders = vscode.workspace.workspaceFolders;
   if (!workspaceFolders) {
