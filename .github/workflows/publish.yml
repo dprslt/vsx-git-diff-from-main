@@ -27,3 +27,6 @@ jobs:
       - run: npx ovsx publish *.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
+      - run: npx vsce publish *.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
