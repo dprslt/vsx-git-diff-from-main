@@ -83,7 +83,7 @@ export class GitService {
    */
   async getCommittedChanges(baseBranch: string): Promise<string[]> {
     try {
-      const { stdout } = await execAsync(`git diff --name-only ${baseBranch} HEAD`, {
+      const { stdout } = await execAsync(`git diff --name-only ${baseBranch}...HEAD`, {
         cwd: this.workspaceRoot
       });
       return stdout.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -203,6 +203,21 @@ export class GitService {
     } catch (error) {
       Logger.error('Error getting regular branches:', error);
       return ['main'];
+    }
+  }
+
+  /**
+   * Get the merge-base (common ancestor) between a branch and HEAD
+   */
+  async getMergeBase(baseBranch: string): Promise<string> {
+    try {
+      const { stdout } = await execAsync(`git merge-base ${baseBranch} HEAD`, {
+        cwd: this.workspaceRoot
+      });
+      return stdout.trim();
+    } catch (error) {
+      Logger.error('[GitService] Error getting merge-base', error);
+      return baseBranch;
     }
   }
 

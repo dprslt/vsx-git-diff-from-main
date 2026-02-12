@@ -101,7 +101,8 @@ export function activate(context: vscode.ExtensionContext) {
         let title: string;
 
         if (section === 'all' || section === 'committed') {
-          ref = baseBranch;
+          const mergeBase = await gitService.getMergeBase(baseBranch);
+          ref = mergeBase;
           title = `${path.basename(absolutePath)} (${baseBranch} ↔ Working Tree)`;
         } else {
           ref = 'HEAD';
