@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  publish:
+  publish-openvsx:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -27,6 +27,6 @@ jobs:
       - run: npx ovsx publish *.vsix
         env:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
-      - run: npx vsce publish *.vsix
+      - run: npx vsce publish
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
