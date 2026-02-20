@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as os from 'os';
 import * as vscode from 'vscode';
+import { GitSpiceBranch } from './types';
 import { Logger } from './logger';
 
 const execAsync = promisify(exec);
@@ -29,15 +30,19 @@ export class GitService {
   }
 
   /**
-   * Run git-spice command and return combined stdout+stderr (git-spice outputs to stderr)
+   * Run `gs ls --json` and parse output into typed branch objects.
+   * Returns null if git-spice is not available.
    */
-  private async runGitSpice(args: string): Promise<string | null> {
+  private async getGitSpiceStack(): Promise<GitSpiceBranch[] | null> {
     try {
       const gsPath = this.getGitSpiceExecutable();
-      const { stdout, stderr } = await execAsync(`${gsPath} ${args}`, {
+      const { stdout } = await execAsync(`${gsPath} ls --json`, {
         cwd: this.workspaceRoot
       });
-      return stdout + stderr;
+      return stdout
+        .split('\n')
+        .filter(line => line.trim().length > 0)
+        .map(line => JSON.parse(line) as GitSpiceBranch);
     } catch (error: unknown) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       if (errorMsg.includes('ENOENT') || errorMsg.includes('command not found')) {
@@ -47,20 +52,6 @@ export class GitService {
       }
       return null;
     }
-  }
-
-  /**
-   * Extract branch name from git-spice output line
-   * Strips tree chars, PR refs (#123), status markers (needs restack), current marker (◀)
-   */
-  private extractBranchName(line: string): string | null {
-    const cleaned = line
-      .replace(/^[\s│├└┏┻━■□─┃]+/, '') // tree chars
-      .replace(/\s*◀\s*$/, '')          // current marker
-      .replace(/\s*\(#\d+\)/g, '')      // PR refs
-      .replace(/\s*\([^)]+\)/g, '')     // status markers
-      .trim();
-    return cleaned.length > 0 ? cleaned : null;
   }
 
   /**
@@ -113,33 +104,30 @@ export class GitService {
   }
 
   /**
-   * Check if currently in a git-spice stack (◀ marker present = current branch tracked)
+   * Check if currently in a git-spice stack (current branch is tracked)
    */
   async isInGitSpiceStack(): Promise<boolean> {
-    const output = await this.runGitSpice('ls');
-    return output !== null && output.includes('◀');
+    const branches = await this.getGitSpiceStack();
+    return branches !== null && branches.some(b => b.current === true);
   }
 
   /**
-   * Get parent branches in git-spice stack (branches below current toward main)
+   * Get parent branches in git-spice stack (branches below current toward main).
+   * Walks the `down` chain from the current branch.
    */
   async getGitSpiceParentBranches(): Promise<string[]> {
-    const output = await this.runGitSpice('ls');
-    if (!output) return [];
+    const branches = await this.getGitSpiceStack();
+    if (!branches) return [];
 
-    const lines = output.split('\n').filter(l => l.length > 0 && !l.startsWith('INF'));
+    const byName = new Map(branches.map(b => [b.name, b]));
+    const current = branches.find(b => b.current === true);
+    if (!current) return [];
+
     const parents: string[] = [];
-    let foundCurrent = false;
-
-    for (const line of lines) {
-      if (line.includes('◀')) {
-        foundCurrent = true;
-        continue;
-      }
-      if (foundCurrent) {
-        const branch = this.extractBranchName(line);
-        if (branch) parents.push(branch);
-      }
+    let next = current.down?.name;
+    while (next) {
+      parents.push(next);
+      next = byName.get(next)?.down?.name;
     }
 
     Logger.log(`[GitService] Parent branches: ${parents.join(', ') || '(none)'}`);
@@ -183,12 +171,9 @@ export class GitService {
    * Falls back to regular git branches if git-spice is not available
    */
   async getGitSpiceBranches(): Promise<string[]> {
-    const output = await this.runGitSpice('ls');
-    if (!output) return this.getRegularBranches();
-
-    const lines = output.split('\n').filter(l => l.length > 0 && !l.startsWith('INF'));
-    const branches = lines.map(l => this.extractBranchName(l)).filter((b): b is string => b !== null);
-    return [...new Set(branches)];
+    const branches = await this.getGitSpiceStack();
+    if (!branches) return this.getRegularBranches();
+    return branches.map(b => b.name);
   }
 
   /**

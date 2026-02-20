@@ -59,3 +59,16 @@ export interface ChangedFile {
   path: string;
   status: FileStatus;
 }
+
+/**
+ * git-spice `gs ls --json` output (one JSON object per line)
+ */
+export interface GitSpiceBranch {
+  name: string;
+  current?: boolean;
+  down?: { name: string; needsRestack?: boolean };
+  ups?: { name: string }[];
+  change?: { id: string; url: string };
+  push?: { ahead: number; behind: number; needsPush?: boolean };
+  worktree?: string;
+}
