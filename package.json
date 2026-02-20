@@ -2,7 +2,7 @@
   "name": "vsx-git-diff-from-main",
   "displayName": "Git Diff Sidebar",
   "description": "Shows files changed from a base branch in the sidebar",
-  "version": "0.0.17",
+  "version": "0.0.18",
   "publisher": "dprslt",
   "license": "MIT",
   "icon": "icon.png",
