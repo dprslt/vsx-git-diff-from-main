@@ -108,7 +108,7 @@ export function activate(context: vscode.ExtensionContext) {
         const absolutePath = fileUri.fsPath;
 
         // Get relative path from workspace root
-        const relativePath = path.relative(workspaceRoot, absolutePath);
+        const relativePath = path.relative(workspaceRoot, absolutePath).split(path.sep).join('/');
 
         let ref: string;
         let title: string;
