@@ -74,7 +74,8 @@ export function activate(context: vscode.ExtensionContext) {
           cwd: workspaceRoot
         });
         return stdout;
-      } catch {
+      } catch (error) {
+        Logger.log(`[GitDiff] No base content for ${relativePath} at ${ref} (new file or deleted)`);
         return '';
       }
     }
@@ -89,9 +90,21 @@ export function activate(context: vscode.ExtensionContext) {
     'gitDiff.openDiff',
     async (fileItem: any) => {
       try {
+        // Fallback: if fileItem is missing or incomplete, use tree view selection
+        if (!fileItem?.resourceUri) {
+          const selected = treeView.selection[0];
+          if (!selected || !('resourceUri' in selected) || !selected.resourceUri) {
+            vscode.window.showErrorMessage('No file selected for diff');
+            return;
+          }
+          fileItem = selected;
+        }
+
         const fileUri = fileItem.resourceUri;
-        const section = fileItem.section;
-        const baseBranch = fileItem.baseBranch;
+        const section = fileItem.section
+          ?? fileItem.contextValue?.replace('fileItem-', '')
+          ?? 'all';
+        const baseBranch = fileItem.baseBranch ?? gitDiffProvider.getBaseBranch();
         const absolutePath = fileUri.fsPath;
 
         // Get relative path from workspace root
