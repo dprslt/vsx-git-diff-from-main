@@ -70,11 +70,14 @@ export class GitService {
   }
 
   /**
-   * Get files that differ from the base branch (committed changes only)
+   * Get files that differ from the base branch (committed changes only).
+   * Uses the remote tracking branch (origin/baseBranch) when available
+   * to match PR behavior — otherwise falls back to the local branch.
    */
   async getCommittedChanges(baseBranch: string): Promise<string[]> {
     try {
-      const { stdout } = await execAsync(`git diff --name-only ${baseBranch}...HEAD`, {
+      const ref = await this.getRemoteRef(baseBranch);
+      const { stdout } = await execAsync(`git diff --name-only ${ref}...HEAD`, {
         cwd: this.workspaceRoot
       });
       return stdout.split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -192,11 +195,13 @@ export class GitService {
   }
 
   /**
-   * Get the merge-base (common ancestor) between a branch and HEAD
+   * Get the merge-base (common ancestor) between a branch and HEAD.
+   * Uses the remote tracking branch when available to match PR behavior.
    */
   async getMergeBase(baseBranch: string): Promise<string> {
     try {
-      const { stdout } = await execAsync(`git merge-base ${baseBranch} HEAD`, {
+      const ref = await this.getRemoteRef(baseBranch);
+      const { stdout } = await execAsync(`git merge-base ${ref} HEAD`, {
         cwd: this.workspaceRoot
       });
       return stdout.trim();
@@ -204,6 +209,29 @@ export class GitService {
       Logger.error('[GitService] Error getting merge-base', error);
       return baseBranch;
     }
+  }
+
+  /**
+   * Resolve a branch name to its remote tracking ref (e.g. origin/main).
+   * Falls back to the local branch name if no remote ref exists.
+   */
+  private async getRemoteRef(branch: string): Promise<string> {
+    // If already a remote ref, use as-is
+    if (branch.includes('/')) {
+      return branch;
+    }
+    try {
+      const { stdout } = await execAsync(`git rev-parse --verify origin/${branch}`, {
+        cwd: this.workspaceRoot
+      });
+      if (stdout.trim()) {
+        Logger.log(`[GitService] Using remote ref origin/${branch}`);
+        return `origin/${branch}`;
+      }
+    } catch {
+      Logger.log(`[GitService] No remote ref for ${branch}, using local`);
+    }
+    return branch;
   }
 
   /**
