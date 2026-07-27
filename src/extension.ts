@@ -3,7 +3,6 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { GitDiffProvider } from './gitDiffProvider';
-import { GitService } from './gitService';
 import { Logger } from './logger';
 
 const execAsync = promisify(exec);
@@ -24,10 +23,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showWarningMessage('Git Diff Sidebar: No workspace folder found');
     return;
   }
-
-  const workspaceRoot = workspaceFolders[0].uri.fsPath;
-  Logger.log(`Workspace root: ${workspaceRoot}`);
-  const gitService = new GitService(workspaceRoot);
+  Logger.log(`Workspace folders: ${workspaceFolders.map(f => f.uri.fsPath).join(', ')}`);
 
   // Register open file command BEFORE creating tree view
   const openFileCommand = vscode.commands.registerCommand(
@@ -68,10 +64,10 @@ export function activate(context: vscode.ExtensionContext) {
   const gitContentProvider = new (class implements vscode.TextDocumentContentProvider {
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
       const params = JSON.parse(uri.query);
-      const { relativePath, ref } = params;
+      const { relativePath, ref, repoRoot } = params;
       try {
         const { stdout } = await execAsync(`git show ${ref}:${relativePath}`, {
-          cwd: workspaceRoot
+          cwd: repoRoot
         });
         return stdout;
       } catch (error) {
@@ -104,17 +100,23 @@ export function activate(context: vscode.ExtensionContext) {
         const section = fileItem.section
           ?? fileItem.contextValue?.replace('fileItem-', '')
           ?? 'all';
-        const baseBranch = fileItem.baseBranch ?? gitDiffProvider.getBaseBranch();
         const absolutePath = fileUri.fsPath;
 
-        // Get relative path from workspace root
-        const relativePath = path.relative(workspaceRoot, absolutePath).split(path.sep).join('/');
+        // Resolve the repository this file belongs to. Prefer the value the
+        // tree item carries; fall back to the file's workspace folder.
+        const repoRoot: string = fileItem.repoRoot
+          ?? vscode.workspace.getWorkspaceFolder(fileUri)?.uri.fsPath
+          ?? workspaceFolders[0].uri.fsPath;
+        const baseBranch = fileItem.baseBranch ?? 'main';
+
+        // Get relative path from the repository root
+        const relativePath = path.relative(repoRoot, absolutePath).split(path.sep).join('/');
 
         let ref: string;
         let title: string;
 
         if (section === 'all' || section === 'committed') {
-          const mergeBase = await gitService.getMergeBase(baseBranch);
+          const mergeBase = await gitDiffProvider.getService(repoRoot).getMergeBase(baseBranch);
           ref = mergeBase;
           title = `${path.basename(absolutePath)} (${baseBranch} ↔ Working Tree)`;
         } else {
@@ -126,7 +128,7 @@ export function activate(context: vscode.ExtensionContext) {
         const gitUri = vscode.Uri.from({
           scheme: 'gitdiff',
           path: absolutePath,
-          query: JSON.stringify({ relativePath, ref })
+          query: JSON.stringify({ relativePath, ref, repoRoot })
         });
 
         await vscode.commands.executeCommand(
@@ -145,9 +147,36 @@ export function activate(context: vscode.ExtensionContext) {
   // Register select base branch command
   const selectBaseBranchCommand = vscode.commands.registerCommand(
     'gitDiff.selectBaseBranch',
-    async () => {
+    async (item?: any) => {
       try {
-        const currentBaseBranch = gitDiffProvider.getBaseBranch();
+        // Resolve which repository to change the base branch for. When invoked
+        // from a repository's context menu the item carries the root; when
+        // invoked from the title bar we pick the only repo, or prompt when
+        // there is more than one.
+        let repoRoot: string | undefined = item?.repoRoot;
+        if (!repoRoot) {
+          const repos = await gitDiffProvider.getRepos();
+          if (repos.length === 0) {
+            vscode.window.showWarningMessage('Git Diff Sidebar: No git repository in workspace');
+            return;
+          }
+          if (repos.length === 1) {
+            repoRoot = repos[0].root;
+          } else {
+            const picked = await vscode.window.showQuickPick(
+              repos.map(r => ({ label: r.name, description: `current: ${r.baseBranch}`, root: r.root })),
+              { title: 'Select repository', placeHolder: 'Choose a repository to change its base branch' }
+            );
+            if (!picked) {
+              return;
+            }
+            repoRoot = picked.root;
+          }
+        }
+
+        const gitService = gitDiffProvider.getService(repoRoot);
+        const currentRepo = (await gitDiffProvider.getRepos()).find(r => r.root === repoRoot);
+        const currentBaseBranch = item?.baseBranch ?? currentRepo?.baseBranch ?? 'main';
 
         // Create QuickPick for sections and dynamic filtering
         const quickPick = vscode.window.createQuickPick();
@@ -214,7 +243,7 @@ export function activate(context: vscode.ExtensionContext) {
             // Strip emoji prefix if present
             const branchName = selected.label.replace(/^🥞 /, '');
             if (branchName !== currentBaseBranch) {
-              await gitDiffProvider.setBaseBranch(branchName);
+              await gitDiffProvider.setBaseBranch(repoRoot, branchName);
               vscode.window.showInformationMessage(`Base branch changed to: ${branchName}`);
             }
           }

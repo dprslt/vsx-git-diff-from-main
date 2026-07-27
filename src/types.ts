@@ -10,6 +10,7 @@ export class FileItem extends vscode.TreeItem {
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
     public readonly section: 'all' | 'committed' | 'uncommitted',
     public readonly baseBranch: string,
+    public readonly repoRoot: string,
     public readonly command?: vscode.Command
   ) {
     super(label, collapsibleState);
@@ -25,17 +26,39 @@ export class FileItem extends vscode.TreeItem {
 }
 
 /**
- * Represents a group header in the tree (e.g., "Committed Changes")
+ * Represents a group header in the tree (e.g., "Committed Changes").
+ * Carries the owning repository so the tree can support multi-root workspaces.
  */
 export class GroupItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-    public readonly id: string
+    public readonly repoRoot: string,
+    public readonly section: 'all' | 'committed' | 'uncommitted',
+    public readonly baseBranch: string
   ) {
     super(label, collapsibleState);
-    this.id = id;
+    // Ids must be unique across the whole tree, so scope them by repository.
+    this.id = `${repoRoot}::${section}`;
     this.contextValue = 'group';
+  }
+}
+
+/**
+ * Represents a repository (workspace folder) header in a multi-root workspace.
+ */
+export class RepoItem extends vscode.TreeItem {
+  constructor(
+    public readonly label: string,
+    public readonly repoRoot: string,
+    public readonly baseBranch: string
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Expanded);
+    this.id = repoRoot;
+    this.contextValue = 'repo';
+    this.description = `from ${baseBranch}`;
+    this.tooltip = repoRoot;
+    this.iconPath = new vscode.ThemeIcon('repo');
   }
 }
 
