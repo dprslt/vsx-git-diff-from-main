@@ -1,7 +1,7 @@
 {
   "name": "vsx-git-diff-from-main",
   "displayName": "Git Diff Sidebar",
-  "description": "Shows files changed from a base branch in the sidebar",
+  "description": "Shows files changed from a base branch in the sidebar, with multi-root workspace support",
   "version": "0.0.21",
   "publisher": "dprslt",
   "license": "MIT",
@@ -69,7 +69,7 @@
         },
         {
           "command": "gitDiff.selectBaseBranch",
-          "when": "view == gitDiffSidebar",
+          "when": "view == gitDiffSidebar && !gitDiff.multiRoot",
           "group": "navigation"
         }
       ],
@@ -77,6 +77,11 @@
         {
           "command": "gitDiff.openDiff",
           "when": "view == gitDiffSidebar && viewItem =~ /^fileItem-/",
+          "group": "inline"
+        },
+        {
+          "command": "gitDiff.selectBaseBranch",
+          "when": "view == gitDiffSidebar && viewItem == repo",
           "group": "inline"
         }
       ]

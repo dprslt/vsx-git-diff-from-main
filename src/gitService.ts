@@ -55,6 +55,41 @@ export class GitService {
   }
 
   /**
+   * Determine a sensible default base branch for this repository.
+   * Prefers the remote's default branch (origin/HEAD) so it matches PR
+   * behavior, then falls back to whichever of main/master exists on the
+   * remote, and finally to "main".
+   */
+  async getDefaultBaseBranch(): Promise<string> {
+    try {
+      const { stdout } = await execAsync(
+        'git symbolic-ref --short refs/remotes/origin/HEAD',
+        { cwd: this.workspaceRoot }
+      );
+      const name = stdout.trim().replace(/^origin\//, '');
+      if (name) {
+        Logger.log(`[GitService] Default base from origin/HEAD: ${name}`);
+        return name;
+      }
+    } catch {
+      Logger.log('[GitService] origin/HEAD not set, trying common defaults');
+    }
+
+    for (const candidate of ['main', 'master']) {
+      try {
+        await execAsync(`git rev-parse --verify origin/${candidate}`, {
+          cwd: this.workspaceRoot
+        });
+        return candidate;
+      } catch {
+        // candidate does not exist on the remote
+      }
+    }
+
+    return 'main';
+  }
+
+  /**
    * Get the current git branch name
    */
   async getCurrentBranch(): Promise<string> {

@@ -4,8 +4,10 @@ VSCode extension that shows files changed from a base branch in the Source Contr
 
 ## Features
 
-- Shows committed changes (diff from base branch, default: `main`)
+- Shows committed changes (diff from base branch)
 - Shows uncommitted changes (staged, unstaged, untracked)
+- Multi-root workspaces: every workspace folder that is a git repository is shown as its own node, each with an independent base branch
+- Auto-detects the base branch from the remote's default branch (`origin/HEAD`), falling back to `main`/`master`
 - Click file to open, click diff icon to view diff
 - Auto-refreshes on file changes
 - Optional [git-spice](https://github.com/abhinav/git-spice) integration for branch selection
@@ -22,6 +24,7 @@ From [Open VSX Registry](https://open-vsx.org/extension/dprslt/vsx-git-diff-from
 1. Open a git repo in VSCode
 2. Find "Changes from Base" in Source Control sidebar
 3. Use toolbar icons to refresh or change base branch
+4. In a multi-root workspace, each repository appears as its own node; change a repository's base branch from its inline branch icon
 
 <img width="387" height="254" alt="image" src="https://github.com/user-attachments/assets/be4678b1-8245-42bd-9688-6da447754eec" />
 
