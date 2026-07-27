@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { GitDiffProvider } from './gitDiffProvider';
@@ -30,6 +31,13 @@ export function activate(context: vscode.ExtensionContext) {
     'gitDiff.openFile',
     async (fileUri: vscode.Uri) => {
       try {
+        // A file listed in the diff may no longer exist in the working tree
+        // (it was deleted on this branch). Opening it as a document would
+        // fail, so fall back to showing its diff instead.
+        if (!fs.existsSync(fileUri.fsPath)) {
+          await vscode.commands.executeCommand('gitDiff.openDiff');
+          return;
+        }
         const document = await vscode.workspace.openTextDocument(fileUri);
         await vscode.window.showTextDocument(document);
       } catch (error) {
@@ -64,7 +72,11 @@ export function activate(context: vscode.ExtensionContext) {
   const gitContentProvider = new (class implements vscode.TextDocumentContentProvider {
     async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
       const params = JSON.parse(uri.query);
-      const { relativePath, ref, repoRoot } = params;
+      const { relativePath, ref, repoRoot, empty } = params;
+      // Used as the (empty) working-tree side of a deleted file's diff.
+      if (empty) {
+        return '';
+      }
       try {
         const { stdout } = await execAsync(`git show ${ref}:${relativePath}`, {
           cwd: repoRoot
@@ -124,18 +136,30 @@ export function activate(context: vscode.ExtensionContext) {
           title = `${path.basename(absolutePath)} (HEAD ↔ Working Tree)`;
         }
 
-        // Build URI for our custom content provider
+        // Build URI for our custom content provider (left / base side)
         const gitUri = vscode.Uri.from({
           scheme: 'gitdiff',
           path: absolutePath,
           query: JSON.stringify({ relativePath, ref, repoRoot })
         });
 
+        // Right side is the working-tree file, unless it was deleted on this
+        // branch — in which case show an empty document so the diff renders
+        // the deletion instead of failing to read a nonexistent file.
+        const rightUri = fs.existsSync(absolutePath)
+          ? fileUri
+          : vscode.Uri.from({
+              scheme: 'gitdiff',
+              path: `${absolutePath}.deleted`,
+              query: JSON.stringify({ relativePath, repoRoot, empty: true })
+            });
+        const diffTitle = fs.existsSync(absolutePath) ? title : `${title} (deleted)`;
+
         await vscode.commands.executeCommand(
           'vscode.diff',
           gitUri,
-          fileUri,
-          title
+          rightUri,
+          diffTitle
         );
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to open diff: ${error}`);
