@@ -1,8 +1,5 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import * as os from 'os';
-import * as vscode from 'vscode';
-import { GitSpiceBranch } from './types';
 import { Logger } from './logger';
 
 const execAsync = promisify(exec);
@@ -15,43 +12,6 @@ export class GitService {
 
   constructor(workspaceRoot: string) {
     this.workspaceRoot = workspaceRoot;
-  }
-
-  /**
-   * Get git-spice executable path from settings (expands ~ to home directory)
-   */
-  private getGitSpiceExecutable(): string {
-    const config = vscode.workspace.getConfiguration('gitDiffSidebar');
-    let path = config.get<string>('gitSpiceExecutable', 'gs');
-    if (path.startsWith('~')) {
-      path = path.replace('~', os.homedir());
-    }
-    return path;
-  }
-
-  /**
-   * Run `gs ls --json` and parse output into typed branch objects.
-   * Returns null if git-spice is not available.
-   */
-  private async getGitSpiceStack(): Promise<GitSpiceBranch[] | null> {
-    try {
-      const gsPath = this.getGitSpiceExecutable();
-      const { stdout } = await execAsync(`${gsPath} ls --json`, {
-        cwd: this.workspaceRoot
-      });
-      return stdout
-        .split('\n')
-        .filter(line => line.trim().length > 0)
-        .map(line => JSON.parse(line) as GitSpiceBranch);
-    } catch (error: unknown) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (errorMsg.includes('ENOENT') || errorMsg.includes('command not found')) {
-        Logger.log(`[GitService] git-spice not found: ${this.getGitSpiceExecutable()}`);
-      } else {
-        Logger.log(`[GitService] git-spice error: ${errorMsg}`);
-      }
-      return null;
-    }
   }
 
   /**
@@ -107,37 +67,6 @@ export class GitService {
   }
 
   /**
-   * Check if currently in a git-spice stack (current branch is tracked)
-   */
-  async isInGitSpiceStack(): Promise<boolean> {
-    const branches = await this.getGitSpiceStack();
-    return branches !== null && branches.some(b => b.current === true);
-  }
-
-  /**
-   * Get parent branches in git-spice stack (branches below current toward main).
-   * Walks the `down` chain from the current branch.
-   */
-  async getGitSpiceParentBranches(): Promise<string[]> {
-    const branches = await this.getGitSpiceStack();
-    if (!branches) return [];
-
-    const byName = new Map(branches.map(b => [b.name, b]));
-    const current = branches.find(b => b.current === true);
-    if (!current) return [];
-
-    const parents: string[] = [];
-    let next = current.down?.name;
-    while (next) {
-      parents.push(next);
-      next = byName.get(next)?.down?.name;
-    }
-
-    Logger.log(`[GitService] Parent branches: ${parents.join(', ') || '(none)'}`);
-    return parents;
-  }
-
-  /**
    * Get recent branches sorted by commit date
    */
   async getRecentBranches(limit: number): Promise<string[]> {
@@ -166,31 +95,6 @@ export class GitService {
     } catch (error) {
       Logger.error('Error filtering branches:', error);
       return [];
-    }
-  }
-
-  /**
-   * Get list of branches from git-spice stack
-   * Falls back to regular git branches if git-spice is not available
-   */
-  async getGitSpiceBranches(): Promise<string[]> {
-    const branches = await this.getGitSpiceStack();
-    if (!branches) return this.getRegularBranches();
-    return branches.map(b => b.name);
-  }
-
-  /**
-   * Get list of regular git branches
-   */
-  private async getRegularBranches(): Promise<string[]> {
-    try {
-      const { stdout } = await execAsync('git branch --format="%(refname:short)"', {
-        cwd: this.workspaceRoot
-      });
-      return stdout.split('\n').map(l => l.trim().replace(/^"|"$/g, '')).filter(l => l.length > 0);
-    } catch (error) {
-      Logger.error('Error getting regular branches:', error);
-      return ['main'];
     }
   }
 

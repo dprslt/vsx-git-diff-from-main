@@ -72,3 +72,61 @@ export interface GitSpiceBranch {
   push?: { ahead: number; behind: number; needsPush?: boolean };
   worktree?: string;
 }
+
+/**
+ * A branch in `gh stack view --json` output
+ */
+export interface GhStackBranch {
+  name: string;
+  /** Tip commit of the branch */
+  head?: string;
+  /** Commit the branch is based on — a SHA, not a branch name */
+  base?: string;
+  isCurrent?: boolean;
+  isMerged?: boolean;
+  isQueued?: boolean;
+  needsRebase?: boolean;
+  pr?: { number: number; url: string; state: string };
+}
+
+/**
+ * `gh stack view --json` output. `branches` is ordered from the trunk upwards.
+ */
+export interface GhStackView {
+  trunk: string;
+  currentBranch: string;
+  branches: GhStackBranch[];
+}
+
+/**
+ * Which tool manages the stack the current branch belongs to
+ */
+export type StackKind = 'github' | 'git-spice';
+
+/**
+ * `gitDiffSidebar.stackProvider` setting values
+ */
+export type StackProviderSetting = 'auto' | StackKind | 'none';
+
+/**
+ * A branch below the current one in the stack
+ */
+export interface StackParent {
+  name: string;
+  kind: StackKind;
+  /** The branch the whole stack is built on (e.g. main) */
+  isTrunk?: boolean;
+  /** Its pull request is already merged */
+  isMerged?: boolean;
+  /** Pull request reference, e.g. `#1234` */
+  changeId?: string;
+}
+
+/**
+ * The stack the current branch belongs to
+ */
+export interface StackContext {
+  kind: StackKind;
+  /** Branches below the current one, closest parent first, trunk last */
+  parents: StackParent[];
+}

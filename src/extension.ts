@@ -4,9 +4,28 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { GitDiffProvider } from './gitDiffProvider';
 import { GitService } from './gitService';
+import { StackService } from './stackService';
+import { StackParent } from './types';
 import { Logger } from './logger';
 
 const execAsync = promisify(exec);
+
+/** Marks a branch that comes from the current stack in the branch picker */
+const STACK_PREFIX = '🥞 ';
+
+/**
+ * Describe where a stack branch comes from, for the branch picker
+ */
+function describeStackParent(parent: StackParent): string {
+  const source = parent.kind === 'github' ? 'GitHub stack' : 'git-spice stack';
+  const details = [
+    parent.isTrunk ? 'trunk' : undefined,
+    parent.isMerged ? 'merged' : undefined,
+    parent.changeId
+  ].filter((detail): detail is string => detail !== undefined);
+
+  return details.length > 0 ? `${source} · ${details.join(' · ')}` : source;
+}
 
 /**
  * Extension activation
@@ -28,6 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
   const workspaceRoot = workspaceFolders[0].uri.fsPath;
   Logger.log(`Workspace root: ${workspaceRoot}`);
   const gitService = new GitService(workspaceRoot);
+  const stackService = new StackService(workspaceRoot);
 
   // Register open file command BEFORE creating tree view
   const openFileCommand = vscode.commands.registerCommand(
@@ -164,16 +184,16 @@ export function activate(context: vscode.ExtensionContext) {
             const filtered = await gitService.filterBranches(filterQuery, 10);
             items.push(...filtered.map(b => ({ label: b })));
           } else {
-            // Show git-spice stack branches (prefixed with emoji) + recent branches
-            const isInStack = await gitService.isInGitSpiceStack();
+            // Show the current stack's branches (prefixed with emoji) + recent branches
+            const stack = await stackService.getStack();
             const stackBranchSet = new Set<string>();
 
-            if (isInStack) {
-              const stackBranches = await gitService.getGitSpiceParentBranches();
-              for (const b of stackBranches) {
-                stackBranchSet.add(b);
-                items.push({ label: `🥞 ${b}`, description: 'git-spice stack' });
-              }
+            for (const parent of stack?.parents ?? []) {
+              stackBranchSet.add(parent.name);
+              items.push({
+                label: `${STACK_PREFIX}${parent.name}`,
+                description: describeStackParent(parent)
+              });
             }
 
             // Recent branches (skip first one which is current branch, and skip stack branches)
@@ -211,8 +231,10 @@ export function activate(context: vscode.ExtensionContext) {
         quickPick.onDidAccept(async () => {
           const selected = quickPick.selectedItems[0];
           if (selected) {
-            // Strip emoji prefix if present
-            const branchName = selected.label.replace(/^🥞 /, '');
+            // Strip stack prefix if present
+            const branchName = selected.label.startsWith(STACK_PREFIX)
+              ? selected.label.slice(STACK_PREFIX.length)
+              : selected.label;
             if (branchName !== currentBaseBranch) {
               await gitDiffProvider.setBaseBranch(branchName);
               vscode.window.showInformationMessage(`Base branch changed to: ${branchName}`);

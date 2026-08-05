@@ -57,6 +57,28 @@
           "type": "string",
           "default": "gs",
           "description": "Path to git-spice executable (gs)"
+        },
+        "gitDiffSidebar.ghExecutable": {
+          "type": "string",
+          "default": "gh",
+          "description": "Path to GitHub CLI executable (gh), used for GitHub stacks via `gh stack`"
+        },
+        "gitDiffSidebar.stackProvider": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "github",
+            "git-spice",
+            "none"
+          ],
+          "enumDescriptions": [
+            "Detect the tool tracking the current branch, preferring GitHub stacks when both do",
+            "Only use GitHub stacks (gh stack)",
+            "Only use git-spice (gs)",
+            "Never list stack branches in the base branch picker"
+          ],
+          "description": "Which stacking tool to read the current stack from"
         }
       }
     },

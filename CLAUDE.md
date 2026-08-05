@@ -2,14 +2,15 @@
 
 ## Overview
 
-VSCode extension showing files changed from a base branch in Source Control sidebar. Supports git-spice for stacked diffs.
+VSCode extension showing files changed from a base branch in Source Control sidebar. Supports GitHub stacks and git-spice for stacked diffs.
 
 ## Architecture
 
 ```
 src/
 ├── extension.ts      # Entry point, commands, activation
-├── gitService.ts     # Git operations (diff, branches, git-spice)
+├── gitService.ts     # Git operations (diff, branches, merge-base)
+├── stackService.ts   # Stack detection (gh stack / git-spice)
 ├── gitDiffProvider.ts # TreeDataProvider for sidebar view
 ├── logger.ts         # Output channel logging
 └── types.ts          # TypeScript interfaces
@@ -27,6 +28,8 @@ src/
 ## Settings
 
 - `gitDiffSidebar.gitSpiceExecutable` - Path to git-spice (`gs` by default)
+- `gitDiffSidebar.ghExecutable` - Path to GitHub CLI (`gh` by default)
+- `gitDiffSidebar.stackProvider` - `auto` (default), `github`, `git-spice` or `none`
 
 ## Development
 
@@ -51,4 +54,8 @@ npm run publish        # Push with tags (CI builds .vsix)
 - Uses `child_process.exec` for git commands
 - TreeView with `vscode.TreeDataProvider`
 - File watcher for auto-refresh
-- git-spice integration via `gs ls` command parsing
+- Stack detection by parsing `gh stack view --json` and `gs ls --json`. Both
+  are probed in parallel; when both track the current branch, GitHub stacks
+  win (that is what the PRs on GitHub are based on). Note `gh stack` state is
+  per-worktree (`$GIT_DIR/gh-stack`), git-spice state is shared per repo
+  (`refs/spice/data`).
